@@ -8,7 +8,7 @@ class UnitDetails(models.Model):
     _description = 'Unit Details'
 
     unit_name = fields.Char(string='Unit Name', required=True)
-    unit_code = fields.Char(string='Unit Code', compute='_compute_unit_code')
+    unit_code = fields.Char(string='Unit Code', compute='_compute_unit_code', store=True)
     unit_image = fields.Binary(string='Unit Image')
     unit_sale_rent = fields.Selection([('sale', 'Sale'), ('rent', 'Rent'), ('both', 'Both')], string='Unit For',
                                       required=True)

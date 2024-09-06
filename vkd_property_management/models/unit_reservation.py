@@ -14,7 +14,7 @@ class UnitReservation(models.Model):
     apartment_details_id = fields.Many2one(comodel_name='apartment.details', string='Apartment', required=True)
     floor_details_id = fields.Many2one(comodel_name='floor.details', string='Floor')
     reserved_date = fields.Date(string="Hold Date", readonly=True)
-    expiration_date = fields.Date(string="Expiration Date", compute="_compute_expiration_date")
+    expiration_date = fields.Date(string="Expiration Date", compute="_compute_expiration_date", store=True)
     reservation_status = fields.Selection([
         ('draft', 'Draft'),
         ('hold', 'Hold'),
@@ -28,22 +28,37 @@ class UnitReservation(models.Model):
 
     @api.model
     def create(self, vals):
+        sale_agent_id = vals.get('sale_agent_id')
+        if sale_agent_id:
+            hold_limit = int(
+                self.env['ir.config_parameter'].sudo().get_param('vkd_property_management.hold_unit_limit'))
+            current_holds = self.env['unit.reservation'].search_count([
+                ('sale_agent_id', '=', sale_agent_id),
+                ('reservation_status', 'in', ['draft', 'hold'])
+            ])
+            if current_holds >= hold_limit:
+                agent = self.env['sale.agent'].browse(sale_agent_id)
+                error_message = _('The agent %s has reached the hold limit of %s units.') % (
+                    agent.full_name, hold_limit)
+                raise ValidationError(error_message)
         if vals.get('reservation_id', 'New') == 'New':
             vals['reservation_id'] = self.env['ir.sequence'].next_by_code('unit.reservation') or 'New'
         return super(UnitReservation, self).create(vals)
 
     def action_unit_hold(self):
-        hold_limit = int(
-            self.env['ir.config_parameter'].sudo().get_param('vkd_property_management.hold_unit_limit'))
+        hold_limit = int(self.env['ir.config_parameter'].sudo().get_param('vkd_property_management.hold_unit_limit'))
         current_holds = self.env['unit.reservation'].search_count([
             ('sale_agent_id', '=', self.sale_agent_id.id),
             ('reservation_status', '=', 'hold')
         ])
         if current_holds >= hold_limit:
-            raise ValidationError(
-                _('The agent %s has reached the hold limit of %s units.') % (self.sale_agent_id.full_name, hold_limit))
+            error_message = _('The agent %s has reached the hold limit of %s units.') % (
+                self.sale_agent_id.full_name, hold_limit)
+            raise ValidationError(error_message)
         self.write({'reservation_status': 'hold', 'reserved_date': date.today()})
         self._update_unit_status('hold')
+
+        return True
 
     def action_unit_reserve(self):
         self.write({'reservation_status': 'reserved'})
