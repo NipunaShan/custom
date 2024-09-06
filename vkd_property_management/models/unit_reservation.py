@@ -34,7 +34,7 @@ class UnitReservation(models.Model):
                 self.env['ir.config_parameter'].sudo().get_param('vkd_property_management.hold_unit_limit'))
             current_holds = self.env['unit.reservation'].search_count([
                 ('sale_agent_id', '=', sale_agent_id),
-                ('reservation_status', 'in', ['draft', 'hold'])
+                ('reservation_status', 'in', ['hold'])
             ])
             if current_holds >= hold_limit:
                 agent = self.env['sale.agent'].browse(sale_agent_id)
